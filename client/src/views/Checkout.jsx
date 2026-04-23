@@ -185,7 +185,7 @@ export default function Checkout() {
             </p>
             <div className="mt-4 flex flex-col items-center justify-center gap-2 sm:flex-row">
               <Link
-                to="/home"
+                to="/produk"
                 className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium text-white transition ${
                   isDark
                     ? "bg-indigo-600 hover:bg-indigo-700"

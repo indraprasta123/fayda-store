@@ -498,6 +498,13 @@ export default function ConfirmDelivery() {
               >
                 Ringkasan Pesanan
               </h2>
+              <p
+                className={`mt-2 text-xs ${
+                  isDark ? "text-slate-400" : "text-slate-500"
+                }`}
+              >
+                Mohon maaf, untuk sementara ini kami hanya menerima order dengan jarak maksimal 30 km saja. Terima kasih.
+              </p>
               <div className="mt-4 space-y-3">
                 {normalizedCart.map((item) => (
                   <div
@@ -587,6 +594,7 @@ export default function ConfirmDelivery() {
                   >
                     Jarak aktual: {shippingInfo.distanceKm.toFixed(2)} km
                   </p>
+                  
                 ) : null}
 
                 <div
