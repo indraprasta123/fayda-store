@@ -5,7 +5,7 @@ export default function AuthLayout() {
   const token = localStorage.getItem("access_token");
   const role = localStorage.getItem("user_role");
   const clientLoginUrl =
-    import.meta.env.VITE_CLIENT_LOGIN_URL || "http://localhost:5173/login";
+    import.meta.env.VITE_CLIENT_LOGIN_URL || "https://faydaa.store/login";
 
   if (token && role === "admin") {
     return <Navigate to="/dashboard" replace />;

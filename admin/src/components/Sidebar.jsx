@@ -10,7 +10,7 @@ const getInitialIsMobile = () => {
 export default function Sidebar() {
   const location = useLocation();
   const clientLogoutUrl =
-    import.meta.env.VITE_CLIENT_LOGOUT_URL || "http://localhost:5173/logout";
+    import.meta.env.VITE_CLIENT_LOGOUT_URL || "https://faydaa.store/logout";
   const [isMobile, setIsMobile] = useState(getInitialIsMobile);
   const [isOpen, setIsOpen] = useState(() => !getInitialIsMobile());
   const sidebarRef = useRef(null);
