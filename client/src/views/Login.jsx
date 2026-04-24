@@ -27,7 +27,7 @@ export default function Login() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const adminDashboardUrl =
     import.meta.env.VITE_ADMIN_DASHBOARD_URL ||
-    "http://localhost:5174/dashboard";
+    "https://admin-fayda-store.web.app/dashboard";
   const canvasRef = useRef(null);
 
   const [form, setForm] = useState({

@@ -13,6 +13,7 @@ const defaultAllowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://faydaa.store",
+  "https://admin-fayda-store.web.app",
 ];
 const envAllowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim())
