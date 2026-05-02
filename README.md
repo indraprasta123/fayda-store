@@ -30,12 +30,104 @@ flowchart LR
 
 ---
 
+## Alur utama
+
+Berikut rangkuman alur **bisnis** dan **alur data** utama. Digambar dengan Mermaid (tampilan otomatis di GitHub dan banyak preview Markdown).
+
+### Alur belanja pelanggan (high level)
+
+```mermaid
+flowchart TD
+  A["Beranda Home"] --> B["Katalog / Produk / AI snack chat"]
+  B --> C["Detail produk"]
+  C --> D["Tambah ke keranjang"]
+  D --> E["Keranjang & checkout"]
+  E --> F{"Sudah login?"}
+  F -->|Belum| G["Login / Register / Google"]
+  G --> E
+  F -->|Sudah| H["Konfirmasi pengiriman + hitung ongkir"]
+  H --> I["Pembayaran (Midtrans atau COD sesuai setup)"]
+  I --> J{"Bayar berhasil?"}
+  J -->|Ya| K["Konfirmasi & riwayat pesanan"]
+  J -->|Tidak / batal| E
+```
+
+### Alur dari sisi sistem (checkout → order)
+
+```mermaid
+sequenceDiagram
+  participant U as Pelanggan
+  participant C as Client React
+  participant S as API Express
+  participant DB as PostgreSQL
+  participant M as Midtrans (opsional)
+
+  U->>C: Isi alamat & pilih kirim
+  C->>S: POST shipping / checkout
+  S->>DB: Order + Payment record
+  S-->>C: Total + ongkir + URL bayar jika ada
+  alt Pembayaran online
+    U->>M: Selesaikan pembayaran
+    M->>S: Webhook / status
+    S->>DB: Update payment & order status
+    S-->>C: Socket/order refresh
+  else COD / tunai
+    U->>C: Konfirmasi
+    S->>DB: Status pending sampai lunas di admin
+  end
+```
+
+### Siklus status order (contoh bisnis umum di aplikasi ini)
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: Order dibuat
+  pending --> processing: Dibayar / diproses admin
+  processing --> shipped: Dikirim
+  shipped --> delivered: Tiba / selesai
+  pending --> cancelled: Batal
+  processing --> cancelled: Batal
+```
+
+### Alur ringkas admin monitoring
+
+```mermaid
+flowchart LR
+  A["Login admin"] --> B["Dashboard statistik"]
+  B --> C["Orders + filter tanggal"]
+  B --> D["Payments + filter tanggal"]
+  B --> E["Produk & kategori"]
+  C --> F["Update status order"]
+  D --> G["Update status bayar"]
+  B --> H["Rekap laporan PDF/Excel"]
+  H --> I["Default: hanya order selesai (delivered)"]
+```
+
+---
+
+## Cuplikan tampilan (ilustrasi)
+
+Gambar di bawah adalah **mockup ilustratif** untuk README (bukan screenshot piksel dari build). Untuk dokumentasi dengan screenshot **asli** dari browser, simpan PNG di folder ini dan tautkan dari sini atau ganti nama file dengan gambar baru.
+
+| Client — beranda & katalog (konsep) | Client — checkout / bayar (konsep) |
+|:---:|:---:|
+| ![Beranda/katalog snack](docs/readme/readme-client-home.png) | ![Checkout & ringkasan](docs/readme/readme-client-checkout.png) |
+
+| Admin — dashboard pesanan / statistik (konsep) |
+|:---:|
+| ![Panel admin orders](docs/readme/readme-admin-dashboard.png) |
+
+**Halaman nyata yang lebih lengkap di codebase (client)** antara lain: `Home`, `Produk`, `DetailProduct`, `Checkout`, `ConfirmDelivery`, `Payment`, login/akun, chat AI snack. **Admin**: `Dashboard`, `Orders`, `Payments`, kelola produk/kategori/users, `RecapReport` (rekap PDF/Excel).
+
+---
+
 ## Struktur repositori
 
 ```
 fayda-store/
 ├── client/          # Aplikasi toko (pelanggan)
 ├── admin/           # Dashboard admin
+├── docs/readme/     # Aset dokumentasi README (gambar mockup)
 ├── server/          # REST API + socket
 │   ├── bin/www      # Entry server (HTTP + Socket.IO)
 │   ├── models/      # Sequelize models
