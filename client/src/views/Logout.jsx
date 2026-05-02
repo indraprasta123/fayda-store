@@ -1,17 +1,19 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { useSettings } from "../context/SettingsContext";
+import { logout as logoutAction } from "../store/authSlice";
 
 export default function Logout() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { resetThemeToLight } = useSettings();
 
   useEffect(() => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user_role");
+    dispatch(logoutAction());
     resetThemeToLight();
     navigate("/login", { replace: true });
-  }, [navigate, resetThemeToLight]);
+  }, [dispatch, navigate, resetThemeToLight]);
 
   return null;
 }

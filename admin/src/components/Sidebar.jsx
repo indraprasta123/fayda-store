@@ -107,16 +107,33 @@ export default function Sidebar() {
       }}
       className="sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-orange-300/40 bg-gradient-to-b from-orange-500 via-orange-500 to-orange-600 text-white shadow-xl"
     >
-      <div className="flex gap-1 items-center justify-between border-b border-white/20 px-4 py-4">
+      <div className="flex gap-2 items-center justify-between border-b border-white/20 px-4 py-4">
         {isOpen ? (
-          <div>
-            <p className="text-lg font-bold leading-tight">Fayda Admin</p>
-            <p className="text-xs text-orange-100">Control Center</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <img
+              src="/fs-mark.svg"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 shrink-0 drop-shadow-sm"
+              decoding="async"
+            />
+            <div className="min-w-0">
+              <p className="text-lg font-bold leading-tight">Fayda Admin</p>
+              <p className="text-xs text-orange-100">Control Center</p>
+            </div>
           </div>
         ) : (
-          <span className="mx-auto rounded-lg bg-white/25 px-2 py-1 text-sm font-semibold">
-            FA
-          </span>
+          <div className="flex min-w-0 flex-1 justify-center">
+            <img
+              src="/fs-mark.svg"
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 drop-shadow-sm"
+              decoding="async"
+            />
+          </div>
         )}
 
         <button

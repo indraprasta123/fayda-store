@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { animate } from "animejs";
 import api from "../api/axios";
@@ -8,6 +8,12 @@ import Swal from "sweetalert2";
 
 const formatRupiah = (value) =>
   `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+
+const PREVIEW_RATINGS_COUNT = 4;
+
+function ratingRowKey(rating, index) {
+  return rating?.id != null ? `rating-${rating.id}` : `rating-i-${index}`;
+}
 
 export default function DetailProduct() {
   const { id } = useParams();
@@ -19,6 +25,9 @@ export default function DetailProduct() {
   const [ratings, setRatings] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [modalStarFilter, setModalStarFilter] = useState(null);
+  const [modalSort, setModalSort] = useState("high");
 
   const headerRef = useRef(null);
   const contentRef = useRef(null);
@@ -78,6 +87,35 @@ export default function DetailProduct() {
 
     return () => animations.forEach((a) => a.pause());
   }, [product]);
+
+  const ratingsListForMemo = ratings?.ratings || [];
+
+  const modalFilteredRatings = useMemo(() => {
+    let list = [...ratingsListForMemo];
+    if (modalStarFilter !== null) {
+      list = list.filter((r) => Number(r.rating) === modalStarFilter);
+    }
+    list.sort((a, b) => {
+      const ra = Number(a.rating);
+      const rb = Number(b.rating);
+      if (ra !== rb) {
+        return modalSort === "high" ? rb - ra : ra - rb;
+      }
+      const ta = new Date(a.createdAt).getTime();
+      const tb = new Date(b.createdAt).getTime();
+      return modalSort === "high" ? tb - ta : ta - tb;
+    });
+    return list;
+  }, [ratingsListForMemo, modalStarFilter, modalSort]);
+
+  useEffect(() => {
+    if (!ratingModalOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setRatingModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ratingModalOpen]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -156,6 +194,89 @@ export default function DetailProduct() {
   const ratingsList = ratings?.ratings || [];
   const stock = Number(product?.stock || 0);
   const isOutOfStock = !Number.isFinite(stock) || stock < 1;
+
+  const previewRatings = ratingsList.slice(0, PREVIEW_RATINGS_COUNT);
+  const hasMoreRatings = ratingsList.length > PREVIEW_RATINGS_COUNT;
+
+  const openRatingsModal = () => {
+    setModalStarFilter(null);
+    setModalSort("high");
+    setRatingModalOpen(true);
+  };
+
+  const renderReviewCard = (rating, index) => (
+    <div
+      key={ratingRowKey(rating, index)}
+      className={`rounded-xl p-4 ${
+        isDark ? "bg-slate-800" : "bg-slate-50"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p
+            className={`font-semibold ${
+              isDark ? "text-slate-100" : "text-slate-900"
+            }`}
+          >
+            {rating.user?.name || "User Anonim"}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="text-lg">{"⭐".repeat(Number(rating.rating) || 0)}</span>
+            <span
+              className={`text-xs ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              {rating.rating} dari 5
+            </span>
+          </div>
+        </div>
+        <p
+          className={`shrink-0 text-xs ${
+            isDark ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
+          {new Date(rating.createdAt).toLocaleDateString("id-ID", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
+        </p>
+      </div>
+
+      {rating.review ? (
+        <p
+          className={`mt-3 leading-relaxed ${
+            isDark ? "text-slate-300" : "text-slate-600"
+          }`}
+        >
+          {rating.review}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const starFilterBtnClass = (stars, active) =>
+    `rounded-full px-3 py-2 text-sm font-semibold transition ${
+      active
+        ? isDark
+          ? "bg-indigo-500 text-white shadow"
+          : "bg-orange-500 text-white shadow"
+        : isDark
+          ? "border border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
+          : "border border-orange-100 bg-white text-slate-700 hover:bg-orange-50"
+    }`;
+
+  const sortBtnClass = (value, active) =>
+    `rounded-full px-4 py-2 text-sm font-semibold transition ${
+      active
+        ? isDark
+          ? "bg-slate-700 text-white ring-1 ring-slate-500"
+          : "bg-orange-100 text-orange-700 ring-1 ring-orange-200"
+        : isDark
+          ? "text-slate-400 hover:bg-slate-800"
+          : "text-slate-600 hover:bg-slate-50"
+    }`;
 
   return (
     <div
@@ -357,64 +478,154 @@ export default function DetailProduct() {
               Belum ada ulasan. Jadilah yang pertama memberikan ulasan!
             </p>
           ) : (
-            <div className="space-y-4">
-              {ratingsList.map((rating, index) => (
-                <div
-                  key={index}
-                  className={`rounded-xl p-4 ${
-                    isDark ? "bg-slate-800" : "bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p
-                        className={`font-semibold ${
-                          isDark ? "text-slate-100" : "text-slate-900"
-                        }`}
-                      >
-                        {rating.user?.name || "User Anonim"}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-lg">
-                          {"⭐".repeat(rating.rating)}
-                        </span>
-                        <span
-                          className={`text-xs ${
-                            isDark ? "text-slate-400" : "text-slate-500"
-                          }`}
-                        >
-                          {rating.rating} dari 5
-                        </span>
-                      </div>
-                    </div>
-                    <p
-                      className={`text-xs ${
-                        isDark ? "text-slate-400" : "text-slate-500"
-                      }`}
-                    >
-                      {new Date(rating.createdAt).toLocaleDateString("id-ID", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-                  </div>
-
-                  {rating.review && (
-                    <p
-                      className={`mt-3 leading-relaxed ${
-                        isDark ? "text-slate-300" : "text-slate-600"
-                      }`}
-                    >
-                      {rating.review}
-                    </p>
-                  )}
+            <>
+              <div className="space-y-4">
+                {previewRatings.map((rating, index) =>
+                  renderReviewCard(rating, index),
+                )}
+              </div>
+              {hasMoreRatings ? (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={openRatingsModal}
+                    className={`rounded-full px-6 py-2.5 text-sm font-semibold transition ${
+                      isDark
+                        ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                        : "bg-orange-500 text-white hover:bg-orange-600"
+                    }`}
+                  >
+                    Selengkapnya ({ratingsList.length} ulasan)
+                  </button>
                 </div>
-              ))}
-            </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
+
+      {ratingModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ratings-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setRatingModalOpen(false);
+          }}
+        >
+          <div
+            className={`flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl shadow-xl ${
+              isDark
+                ? "border border-slate-700 bg-slate-900"
+                : "border border-orange-100 bg-white"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-4 sm:px-6 ${
+                isDark ? "border-slate-700" : "border-orange-100"
+              }`}
+            >
+              <h3
+                id="ratings-modal-title"
+                className={`text-lg font-bold ${
+                  isDark ? "text-slate-100" : "text-slate-900"
+                }`}
+              >
+                Semua ulasan ({modalFilteredRatings.length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRatingModalOpen(false)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                  isDark
+                    ? "text-slate-300 hover:bg-slate-800"
+                    : "text-slate-600 hover:bg-orange-50"
+                }`}
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="shrink-0 space-y-4 border-b px-4 py-4 sm:px-6 sm:py-5">
+              <div>
+                <p
+                  className={`mb-2 text-xs font-medium uppercase tracking-wide ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Filter bintang
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalStarFilter(null)}
+                    className={starFilterBtnClass(null, modalStarFilter === null)}
+                  >
+                    Semua
+                  </button>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setModalStarFilter(n)}
+                      className={starFilterBtnClass(n, modalStarFilter === n)}
+                      aria-pressed={modalStarFilter === n}
+                    >
+                      {"⭐".repeat(n)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p
+                  className={`mb-2 text-xs font-medium uppercase tracking-wide ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Urutkan
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalSort("high")}
+                    className={sortBtnClass("high", modalSort === "high")}
+                  >
+                    Rating tertinggi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalSort("low")}
+                    className={sortBtnClass("low", modalSort === "low")}
+                  >
+                    Rating terendah
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+              {modalFilteredRatings.length === 0 ? (
+                <p
+                  className={`py-8 text-center text-sm ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Tidak ada ulasan untuk filter ini.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {modalFilteredRatings.map((rating, index) =>
+                    renderReviewCard(rating, index),
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

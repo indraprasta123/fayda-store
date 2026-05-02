@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { clearCheckoutSession } from "../utils/cartStorage";
 
 const initialState = {
   access_token: localStorage.getItem("access_token") || null,
@@ -28,6 +29,7 @@ const authSlice = createSlice({
       state.user = null;
       localStorage.removeItem("access_token");
       localStorage.removeItem("user_role");
+      clearCheckoutSession();
     },
   },
 });

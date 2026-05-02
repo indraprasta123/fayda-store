@@ -1,5 +1,55 @@
 const CART_STORAGE_KEY = "cart_items";
+const CART_OWNER_KEY = "cart_session_owner_id";
 const LEGACY_CART_KEYS = ["cart"];
+const DELIVERY_INFO_KEY = "deliveryInfo";
+
+/** User id dari JWT, atau "guest" jika belum login */
+function getSessionCartOwnerId() {
+  const token = localStorage.getItem("access_token");
+  if (!token) return "guest";
+  try {
+    const payload = token.split(".")[1];
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(atob(normalized));
+    const id = decoded?.id;
+    return id != null ? String(id) : "guest";
+  } catch {
+    return "guest";
+  }
+}
+
+/**
+ * Hapus keranjang + draft pengiriman + tag pemilik (dipanggil saat logout).
+ */
+export function clearCheckoutSession() {
+  localStorage.removeItem(CART_STORAGE_KEY);
+  localStorage.removeItem(CART_OWNER_KEY);
+  for (const key of LEGACY_CART_KEYS) {
+    localStorage.removeItem(key);
+  }
+  localStorage.removeItem(DELIVERY_INFO_KEY);
+  window.dispatchEvent(new Event("cart-updated"));
+}
+
+function cartAllowedForSession(storedOwner, sessionOwner, cartLength) {
+  if (cartLength === 0) return true;
+
+  // Keranjang milik user tertentu — hanya boleh dipakai saat login sebagai user itu
+  if (storedOwner && storedOwner !== "guest") {
+    if (sessionOwner === "guest" || sessionOwner !== storedOwner) {
+      return false;
+    }
+    return true;
+  }
+
+  // Tanpa tag pemilik + sudah login → data lama tidak tahu siapa pemiliknya → tolak
+  if (!storedOwner && sessionOwner !== "guest") {
+    return false;
+  }
+
+  // "guest" atau belum ada tag + mode tamu → boleh (termasuk bawa keranjang tamu ke akun setelah login)
+  return true;
+}
 
 const normalizeCart = (value) => {
   if (!Array.isArray(value)) return [];
@@ -31,10 +81,20 @@ const normalizeCart = (value) => {
 
 export const readCartItems = () => {
   try {
+    const sessionOwner = getSessionCartOwnerId();
+    const storedOwner = localStorage.getItem(CART_OWNER_KEY);
+
     const primary = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
     const normalizedPrimary = normalizeCart(primary);
 
     if (normalizedPrimary.length > 0) {
+      if (!cartAllowedForSession(storedOwner, sessionOwner, normalizedPrimary.length)) {
+        clearCheckoutSession();
+        return [];
+      }
+      if (!storedOwner && sessionOwner === "guest") {
+        localStorage.setItem(CART_OWNER_KEY, "guest");
+      }
       return normalizedPrimary;
     }
 
@@ -43,9 +103,14 @@ export const readCartItems = () => {
       const normalizedLegacy = normalizeCart(legacy);
 
       if (normalizedLegacy.length > 0) {
+        if (!cartAllowedForSession(storedOwner, sessionOwner, normalizedLegacy.length)) {
+          clearCheckoutSession();
+          return [];
+        }
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(normalizedLegacy));
         localStorage.setItem(
-          CART_STORAGE_KEY,
-          JSON.stringify(normalizedLegacy),
+          CART_OWNER_KEY,
+          storedOwner || (sessionOwner === "guest" ? "guest" : sessionOwner),
         );
         return normalizedLegacy;
       }
@@ -60,6 +125,7 @@ export const readCartItems = () => {
 export const writeCartItems = (items) => {
   const normalizedItems = normalizeCart(items);
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(normalizedItems));
+  localStorage.setItem(CART_OWNER_KEY, getSessionCartOwnerId());
   window.dispatchEvent(new Event("cart-updated"));
 };
 

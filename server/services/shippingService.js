@@ -75,6 +75,9 @@ function finalizeShipping(distance) {
     };
   }
 
+  // Tarif bertingkat (bulatkan ke atas per km):
+  // — sampai 10 km: Rp 1.000 / km
+  // — di atas 10 km: 10 km pertama @ Rp 1.000/km + sisa @ Rp 2.000/km
   let shippingCost = 0;
 
   if (distance <= 10) {
@@ -82,9 +85,6 @@ function finalizeShipping(distance) {
   } else {
     shippingCost = 10 * 1000 + Math.ceil(distance - 10) * 2000;
   }
-
-  const minShipping = 8000;
-  shippingCost = Math.max(shippingCost, minShipping);
 
   return {
     distance: Number(distance.toFixed(2)),

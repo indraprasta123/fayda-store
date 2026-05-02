@@ -1,8 +1,10 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { animate } from "animejs";
 import { useEffect, useRef, useState } from "react";
+import { useDispatch } from "react-redux";
 import { getCartCount, readCartItems } from "../utils/cartStorage";
 import { useSettings } from "../context/SettingsContext";
+import { logout as logoutAction } from "../store/authSlice";
 import socket from "../utils/socket";
 
 export default function Navbar() {
@@ -11,13 +13,14 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { theme, toggleTheme, resetThemeToLight } = useSettings();
   const isDark = theme === "dark";
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
+    dispatch(logoutAction());
     resetThemeToLight();
     navigate("/login");
   };
@@ -131,9 +134,14 @@ export default function Navbar() {
     >
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 md:px-6">
         <Link to="/home" className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-orange-400 to-orange-600 text-sm font-bold text-white">
-            FS
-          </span>
+          <img
+            src="/fs-mark.svg"
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0"
+            decoding="async"
+          />
           <div>
             <p
               className={`text-sm font-semibold leading-tight ${

@@ -525,7 +525,6 @@ export default function Home() {
                   label: "Produk populer",
                   value: `${featuredProducts.length}+`,
                 },
-                { label: "Pesanan cepat", value: "24/7" },
                 { label: "Tampilan responsif", value: "100%" },
               ].map((item, index) => (
                 <article

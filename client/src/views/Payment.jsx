@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSettings } from "../context/SettingsContext";
 import api from "../api/axios";
 import Swal from "sweetalert2";
+import { readCartItems, clearCheckoutSession } from "../utils/cartStorage";
 
 export default function Payment() {
   const { theme } = useSettings();
@@ -11,7 +12,7 @@ export default function Payment() {
   const navigate = useNavigate();
 
   const deliveryInfo = JSON.parse(localStorage.getItem("deliveryInfo") || "{}");
-  const cartItems = JSON.parse(localStorage.getItem("cart_items") || "[]");
+  const cartItems = readCartItems();
 
   const totalPrice = useMemo(
     () =>
@@ -97,9 +98,7 @@ export default function Payment() {
           }),
         );
 
-        // Clear cart and delivery info
-        localStorage.removeItem("cart_items");
-        localStorage.removeItem("deliveryInfo");
+        clearCheckoutSession();
 
         setIsLoading(false);
 
@@ -139,9 +138,7 @@ export default function Payment() {
             }),
           );
 
-          // Clear cart and delivery info
-          localStorage.removeItem("cart_items");
-          localStorage.removeItem("deliveryInfo");
+          clearCheckoutSession();
 
           setIsLoading(false);
 
