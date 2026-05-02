@@ -1,13 +1,26 @@
 import Sidebar from "../components/Sidebar";
 import { animate } from "animejs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/axios";
 import socket from "../utils/socket";
+
+const formatCompactIdr = (value) => {
+  const v = Number(value || 0);
+  if (!Number.isFinite(v) || v === 0) return "0";
+  if (v >= 1_000_000_000)
+    return `${(v / 1_000_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} M`;
+  if (v >= 1_000_000)
+    return `${(v / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} jt`;
+  if (v >= 1_000)
+    return `${Math.round(v / 1_000).toLocaleString("id-ID")} rb`;
+  return String(Math.round(v));
+};
 
 export default function Dashboard() {
   const [overview, setOverview] = useState({
     totalUsers: 0,
-    totalOrders: 0,
+    totalOrdersAll: 0,
+    deliveredOrdersCount: 0,
     totalRevenue: 0,
   });
   const [monthlyStats, setMonthlyStats] = useState([]);
@@ -78,23 +91,26 @@ export default function Dashboard() {
   const statItems = useMemo(
     () => [
       {
-        title: "Total Users",
+        title: "Total pengguna",
         value: Number(overview.totalUsers || 0).toLocaleString("id-ID"),
+        hint: "Akun terdaftar",
         accent: "from-orange-400 to-orange-500",
       },
       {
-        title: "Total Orders",
-        value: Number(overview.totalOrders || 0).toLocaleString("id-ID"),
+        title: "Total order",
+        value: Number(overview.totalOrdersAll ?? 0).toLocaleString("id-ID"),
+        hint: "Semua status",
         accent: "from-amber-400 to-orange-500",
       },
       {
-        title: "Revenue",
+        title: "Omzet penjualan",
         value: `Rp ${Number(overview.totalRevenue || 0).toLocaleString(
           "id-ID",
           {
             maximumFractionDigits: 0,
           },
         )}`,
+        hint: `${Number(overview.deliveredOrdersCount ?? 0).toLocaleString("id-ID")} order selesai`,
         accent: "from-orange-500 to-red-500",
       },
     ],
@@ -133,13 +149,20 @@ export default function Dashboard() {
     });
   };
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
 
       const { data } = await api.get("/admin/dashboard/stats");
-      setOverview(data?.overview || {});
+      setOverview(
+        data?.overview || {
+          totalUsers: 0,
+          totalOrdersAll: 0,
+          deliveredOrdersCount: 0,
+          totalRevenue: 0,
+        },
+      );
       setMonthlyStats(
         Array.isArray(data?.monthlyStats) ? data.monthlyStats : [],
       );
@@ -152,27 +175,23 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [fetchDashboard]);
 
   useEffect(() => {
-    const handleRefresh = () => {
-      fetchDashboard();
-    };
-
-    socket.on("dashboard:refresh", handleRefresh);
-    socket.on("order:created", handleRefresh);
-    socket.on("order:status-updated", handleRefresh);
+    socket.on("dashboard:refresh", fetchDashboard);
+    socket.on("order:created", fetchDashboard);
+    socket.on("order:status-updated", fetchDashboard);
 
     return () => {
-      socket.off("dashboard:refresh", handleRefresh);
-      socket.off("order:created", handleRefresh);
-      socket.off("order:status-updated", handleRefresh);
+      socket.off("dashboard:refresh", fetchDashboard);
+      socket.off("order:created", fetchDashboard);
+      socket.off("order:status-updated", fetchDashboard);
     };
-  }, []);
+  }, [fetchDashboard]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -270,6 +289,12 @@ export default function Dashboard() {
             Pantau performa toko, transaksi, dan aktivitas terbaru dari satu
             tempat.
           </p>
+          <p className="mt-3 max-w-3xl text-xs text-orange-100/95 md:text-sm">
+            Omzet serta grafik bulanan/harian menghitung{" "}
+            <strong className="font-semibold text-white">order selesai</strong>{" "}
+            (sesuai Rekap Laporan). Total order di kartu adalah{" "}
+            <strong className="font-semibold text-white">semua status</strong>.
+          </p>
         </section>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -289,6 +314,9 @@ export default function Dashboard() {
               <p className="mt-4 text-3xl font-bold text-slate-800">
                 {item.value}
               </p>
+              {item.hint ? (
+                <p className="mt-2 text-xs text-slate-500">{item.hint}</p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -305,14 +333,14 @@ export default function Dashboard() {
             className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm"
           >
             <h2 className="mb-4 text-xl font-semibold text-slate-800">
-              Laporan Statistik Bulanan
+              Penjualan per bulan (order selesai)
             </h2>
             <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50/40 p-3">
               <svg
                 viewBox={`0 0 ${monthlyChartData.width} ${monthlyChartData.height}`}
                 className="h-52 w-full"
                 role="img"
-                aria-label="Diagram garis revenue bulanan"
+                aria-label="Diagram garis omzet bulanan order selesai"
               >
                 <path
                   d={`M26,194 L614,194`}
@@ -346,7 +374,7 @@ export default function Dashboard() {
                           fontSize="11"
                           fill="#9a3412"
                         >
-                          {Math.round(Number(point.revenue || 0) / 1000)}k
+                          Rp {formatCompactIdr(point.revenue)}
                         </text>
                         <text
                           x={point.x}
@@ -371,10 +399,10 @@ export default function Dashboard() {
                       Bulan
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                      Total Order
+                      Order selesai
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                      Revenue
+                      Omzet
                     </th>
                   </tr>
                 </thead>
@@ -425,7 +453,7 @@ export default function Dashboard() {
             className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm"
           >
             <h2 className="mb-4 text-xl font-semibold text-slate-800">
-              Order Masuk Per Hari
+              Penjualan per hari (order selesai)
             </h2>
             <div className="overflow-x-auto">
               <table className="min-w-full overflow-hidden rounded-xl">
@@ -435,10 +463,10 @@ export default function Dashboard() {
                       Tanggal
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                      Total Order
+                      Order selesai
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                      Revenue
+                      Omzet
                     </th>
                   </tr>
                 </thead>
@@ -490,7 +518,7 @@ export default function Dashboard() {
           className="mt-6 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm"
         >
           <h2 className="mb-4 text-2xl font-semibold text-slate-800">
-            Order Hari Ini
+            Order hari ini (semua status)
           </h2>
           <div className="overflow-x-auto">
             <table className="min-w-full overflow-hidden rounded-xl">

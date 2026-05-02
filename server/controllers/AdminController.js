@@ -8,7 +8,7 @@ const {
   Payment,
   Rating,
 } = require("../models");
-const { Op, fn, col } = require("sequelize");
+const { Op, fn, col, QueryTypes } = require("sequelize");
 const {
   emitOrderStatusUpdated,
   emitProductSync,
@@ -317,78 +317,87 @@ class AdminController {
   // ===================== Order Management =====================
   static async getDashboardStats(req, res, next) {
     try {
-      const [totalUsers, orders] = await Promise.all([
-        User.count(),
-        Order.findAll({
-          include: [
-            { model: User, as: "user", attributes: ["id", "name", "email"] },
-          ],
-          order: [["createdAt", "DESC"]],
-        }),
-      ]);
-
-      const totalOrders = orders.length;
-      const totalRevenue = orders.reduce(
-        (sum, order) => sum + Number(order.total_price || 0),
-        0,
-      );
-
-      const monthFormatter = new Intl.DateTimeFormat("id-ID", {
-        month: "short",
-        year: "numeric",
-      });
+      const sequelize = Order.sequelize;
+      const jakartaOrdersTs =
+        '("Orders"."createdAt" AT TIME ZONE \'UTC\') AT TIME ZONE \'Asia/Jakarta\'';
 
       const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
         timeZone: "Asia/Jakarta",
       });
-
-      const monthlyMap = new Map();
-      const dailyMap = new Map();
-
-      orders.forEach((order) => {
-        const orderDate = new Date(order.createdAt);
-
-        const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}`;
-        const monthLabel = monthFormatter.format(orderDate);
-
-        if (!monthlyMap.has(monthKey)) {
-          monthlyMap.set(monthKey, {
-            monthKey,
-            monthLabel,
-            totalOrders: 0,
-            revenue: 0,
-          });
-        }
-
-        const monthlyEntry = monthlyMap.get(monthKey);
-        monthlyEntry.totalOrders += 1;
-        monthlyEntry.revenue += Number(order.total_price || 0);
-
-        const dateKey = dateFormatter.format(orderDate);
-
-        if (!dailyMap.has(dateKey)) {
-          dailyMap.set(dateKey, {
-            date: dateKey,
-            totalOrders: 0,
-            revenue: 0,
-          });
-        }
-
-        const dailyEntry = dailyMap.get(dateKey);
-        dailyEntry.totalOrders += 1;
-        dailyEntry.revenue += Number(order.total_price || 0);
-      });
-
-      const monthlyStats = Array.from(monthlyMap.values())
-        .sort((a, b) => b.monthKey.localeCompare(a.monthKey))
-        .slice(0, 6);
-
-      const dailyOrders = Array.from(dailyMap.values())
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 14);
-
       const todayKey = dateFormatter.format(new Date());
-      const todayOrders = orders
+
+      const [
+        totalUsers,
+        totalOrdersAll,
+        deliveredAgg,
+        monthlyRows,
+        dailyRows,
+        recentOrderCandidates,
+      ] = await Promise.all([
+        User.count(),
+        Order.count(),
+        Order.findOne({
+          attributes: [
+            [fn("COUNT", col("id")), "cnt"],
+            [fn("SUM", col("total_price")), "rev"],
+          ],
+          where: { status: "delivered" },
+          raw: true,
+        }),
+        sequelize.query(
+          `SELECT
+            TO_CHAR(date_trunc('month', ${jakartaOrdersTs}), 'YYYY-MM') AS "monthKey",
+            COUNT(*)::integer AS "totalOrders",
+            COALESCE(SUM(CAST("Orders"."total_price" AS DECIMAL)), 0) AS revenue
+          FROM "Orders"
+          WHERE LOWER(TRIM("Orders".status)) = 'delivered'
+          GROUP BY date_trunc('month', ${jakartaOrdersTs})
+          ORDER BY date_trunc('month', ${jakartaOrdersTs}) DESC
+          LIMIT 6`,
+          { type: QueryTypes.SELECT },
+        ),
+        sequelize.query(
+          `SELECT
+            TO_CHAR((${jakartaOrdersTs})::date, 'YYYY-MM-DD') AS date,
+            COUNT(*)::integer AS "totalOrders",
+            COALESCE(SUM(CAST("Orders"."total_price" AS DECIMAL)), 0) AS revenue
+          FROM "Orders"
+          WHERE LOWER(TRIM("Orders".status)) = 'delivered'
+          GROUP BY (${jakartaOrdersTs})::date
+          ORDER BY (${jakartaOrdersTs})::date DESC
+          LIMIT 14`,
+          { type: QueryTypes.SELECT },
+        ),
+        Order.findAll({
+          attributes: ["id", "total_price", "status", "createdAt"],
+          include: [
+            { model: User, as: "user", attributes: ["name"] },
+          ],
+          order: [["createdAt", "DESC"]],
+          limit: 120,
+        }),
+      ]);
+
+      const deliveredOrdersCount = Number(deliveredAgg?.cnt || 0);
+      const revenueDelivered = Number(deliveredAgg?.rev || 0);
+
+      const monthlyStats = monthlyRows.map((row) => ({
+        monthKey: row.monthKey,
+        monthLabel: new Date(`${row.monthKey}-01T12:00:00+07:00`).toLocaleDateString(
+          "id-ID",
+          { month: "short", year: "numeric" },
+        ),
+        totalOrders: Number(row.totalOrders || 0),
+        revenue: Number(row.revenue || 0),
+      }));
+
+      const dailyOrders = dailyRows.map((row) => ({
+        date: row.date,
+        totalOrders: Number(row.totalOrders || 0),
+        revenue: Number(row.revenue || 0),
+      }));
+
+      const todayOrders = recentOrderCandidates
         .filter(
           (order) =>
             dateFormatter.format(new Date(order.createdAt)) === todayKey,
@@ -405,8 +414,9 @@ class AdminController {
       res.status(200).json({
         overview: {
           totalUsers,
-          totalOrders,
-          totalRevenue,
+          totalOrdersAll,
+          deliveredOrdersCount,
+          totalRevenue: revenueDelivered,
         },
         monthlyStats,
         dailyOrders,
