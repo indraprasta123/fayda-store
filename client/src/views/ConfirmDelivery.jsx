@@ -310,7 +310,7 @@ export default function ConfirmDelivery() {
               : "bg-linear-to-r from-orange-500 via-orange-500 to-amber-500"
           }`}
         >
-          <h1 className="text-3xl font-bold md:text-4xl">Confirm Delivery</h1>
+          <h1 className="text-3xl font-bold md:text-4xl">Konfirmasi Alamat Pesanan</h1>
           <p className="mt-2 text-sm text-orange-50 md:text-base">
             Lengkapi detail alamat pengiriman sebelum lanjut ke pembayaran.
           </p>

@@ -1,5 +1,5 @@
 import { animate } from "animejs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import Sidebar from "../components/Sidebar";
 import api from "../api/axios";
@@ -54,16 +54,21 @@ export default function Orders() {
   const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const headerRef = useRef(null);
   const cardRefs = useRef([]);
   const tableRef = useRef(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      const { data } = await api.get("/admin/orders");
+      const params = {};
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo) params.dateTo = dateTo;
+      const { data } = await api.get("/admin/orders", { params });
       setOrders(Array.isArray(data?.orders) ? data.orders : []);
     } catch (error) {
       setErrorMessage(
@@ -72,43 +77,21 @@ export default function Orders() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   useEffect(() => {
-    const handleOrderStatusUpdated = (payload) => {
-      const { orderId, status, paymentStatus, updatedAt } = payload || {};
-      if (!orderId || !status) return;
-
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                status,
-                payment_status: paymentStatus ?? order.payment_status,
-                updatedAt: updatedAt || order.updatedAt,
-              }
-            : order,
-        ),
-      );
-    };
-
-    const handleOrderCreated = () => {
-      fetchOrders();
-    };
-
-    socket.on("order:status-updated", handleOrderStatusUpdated);
-    socket.on("order:created", handleOrderCreated);
+    socket.on("order:status-updated", fetchOrders);
+    socket.on("order:created", fetchOrders);
 
     return () => {
-      socket.off("order:status-updated", handleOrderStatusUpdated);
-      socket.off("order:created", handleOrderCreated);
+      socket.off("order:status-updated", fetchOrders);
+      socket.off("order:created", fetchOrders);
     };
-  }, []);
+  }, [fetchOrders]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -247,7 +230,8 @@ export default function Orders() {
         >
           <h1 className="text-3xl font-bold md:text-4xl">Orders</h1>
           <p className="mt-2 text-sm text-orange-50 md:text-base">
-            Pantau dan kelola seluruh pesanan customer dengan cepat.
+            Pantau dan kelola pesanan customer — filter tanggal memakai tanggal
+            dibuat order.
           </p>
         </section>
 
@@ -281,19 +265,49 @@ export default function Orders() {
               Order List
             </h2>
 
-            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+            <div className="flex w-full flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Dari
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                    className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Sampai
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(event) => setDateTo(event.target.value)}
+                    className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                  className="mt-5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-orange-50"
+                >
+                  Reset tanggal
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="Cari ID / Nama / Email"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 md:w-64"
+                className="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 lg:w-56"
               />
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 lg:w-auto"
               >
                 <option value="all">Semua Status</option>
                 {ORDER_STATUS_OPTIONS.map((status) => (

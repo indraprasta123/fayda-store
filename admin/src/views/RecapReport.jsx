@@ -18,6 +18,11 @@ const TOP_SCOPE_OPTIONS = [
   { value: "year", label: "Tahun Ini" },
 ];
 
+const ORDER_SCOPE_OPTIONS = [
+  { value: "sales", label: "Order selesai saja (penjualan)" },
+  { value: "all", label: "Semua status" },
+];
+
 const statusLabel = {
   pending: "Pending",
   processing: "Diproses",
@@ -67,6 +72,7 @@ export default function RecapReport() {
     String(new Date().getFullYear()),
   );
   const [topScope, setTopScope] = useState("day");
+  const [orderScope, setOrderScope] = useState("sales");
 
   const [summary, setSummary] = useState({
     totalOrders: 0,
@@ -113,6 +119,7 @@ export default function RecapReport() {
       const params = {
         period,
         topScope,
+        ...(orderScope === "all" ? { orderScope: "all" } : {}),
       };
 
       if (period === "day") {
@@ -140,7 +147,14 @@ export default function RecapReport() {
 
   useEffect(() => {
     fetchRecapReport();
-  }, [period, selectedDate, selectedMonth, selectedYear, topScope]);
+  }, [
+    period,
+    selectedDate,
+    selectedMonth,
+    selectedYear,
+    topScope,
+    orderScope,
+  ]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -244,6 +258,10 @@ export default function RecapReport() {
         "Total Order": summary.totalOrders || 0,
         "Total Item Terjual": summary.totalItemsSold || 0,
         "Total Revenue": Number(summary.totalRevenue || 0),
+        Cakupan:
+          orderScope === "all"
+            ? "Semua status"
+            : "Order selesai (delivered) saja",
       },
     ]);
 
@@ -262,14 +280,19 @@ export default function RecapReport() {
     doc.text("Rekap Laporan Penjualan", 14, 16);
 
     doc.setFontSize(10);
+    const scopeLine =
+      orderScope === "all"
+        ? "Cakupan: semua status order"
+        : "Cakupan: order selesai (delivered) saja";
+    doc.text(scopeLine, 14, 22);
     doc.text(
       `Total Order: ${summary.totalOrders || 0} | Total Item: ${summary.totalItemsSold || 0} | Revenue: ${toCurrency(summary.totalRevenue || 0)}`,
       14,
-      24,
+      28,
     );
 
     autoTable(doc, {
-      startY: 30,
+      startY: 34,
       head: [["Order ID", "User", "Item", "Total", "Status", "Tanggal"]],
       body: orders.map((order) => [
         `#${order.id}`,
@@ -325,7 +348,7 @@ export default function RecapReport() {
           ref={filterCardRef}
           className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm print:hidden"
         >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <select
               value={period}
               onChange={(event) => setPeriod(event.target.value)}
@@ -395,7 +418,25 @@ export default function RecapReport() {
                 </option>
               ))}
             </select>
+
+            <select
+              value={orderScope}
+              onChange={(event) => setOrderScope(event.target.value)}
+              className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none focus:border-orange-400 md:col-span-2 xl:col-span-1"
+            >
+              {ORDER_SCOPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <p className="mt-3 text-xs text-slate-600 print:hidden">
+            {orderScope === "sales"
+              ? "Ringkasan dan daftar order mengikuti status Selesai saja. Pilih “Semua status” untuk audit lengkap."
+              : "Semua status order dimasukkan ke ringkasan dan tabel."}
+          </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <button

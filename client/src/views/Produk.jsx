@@ -363,7 +363,16 @@ export default function Produk() {
                   return (
                     <article
                       key={item.id}
-                      className={`overflow-hidden rounded-2xl border shadow-lg transition duration-300 hover:-translate-y-1 ${
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => navigate(`/produk/${item.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/produk/${item.id}`);
+                        }
+                      }}
+                      className={`cursor-pointer overflow-hidden rounded-2xl border shadow-lg transition duration-300 hover:-translate-y-1 ${
                         isDark
                           ? "border-slate-700 bg-slate-950/75"
                           : "border-slate-100 bg-white"
@@ -535,7 +544,16 @@ export default function Produk() {
                   ref={(el) => {
                     cardRefs.current[index] = el;
                   }}
-                  className={`group overflow-hidden rounded-3xl border shadow-lg transition duration-300 hover:-translate-y-2 ${
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/produk/${item.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/produk/${item.id}`);
+                    }
+                  }}
+                  className={`group cursor-pointer overflow-hidden rounded-3xl border shadow-lg transition duration-300 hover:-translate-y-2 ${
                     isDark
                       ? "border-slate-800 bg-slate-900 hover:shadow-[0_20px_50px_rgba(79,70,229,0.2)]"
                       : "border-orange-100 bg-white hover:shadow-[0_20px_50px_rgba(249,115,22,0.18)]"
@@ -593,23 +611,15 @@ export default function Produk() {
                       </div>
                     </div>
 
-                    <div className="mt-5 flex gap-2">
+                    <div className="mt-5">
                       <button
                         type="button"
-                        onClick={() => navigate(`/produk/${item.id}`)}
-                        className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold text-white transition duration-300 ${
-                          isDark
-                            ? "bg-slate-700 hover:bg-slate-600"
-                            : "bg-slate-500 hover:bg-slate-600"
-                        }`}
-                      >
-                        Lihat Detail
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(item);
+                        }}
                         disabled={isOutOfStock}
-                        className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold text-white transition duration-300 ${
+                        className={`w-full rounded-xl px-3 py-2 text-xs font-semibold text-white transition duration-300 ${
                           isOutOfStock
                             ? "cursor-not-allowed bg-slate-400"
                             : isDark

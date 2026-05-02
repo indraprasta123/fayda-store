@@ -1,8 +1,9 @@
 import { animate } from "animejs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import Sidebar from "../components/Sidebar";
 import api from "../api/axios";
+import socket from "../utils/socket";
 
 const PAYMENT_STATUS_OPTIONS = ["pending", "paid", "failed", "expired"];
 
@@ -64,16 +65,21 @@ export default function Payments() {
   const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const headerRef = useRef(null);
   const cardRefs = useRef([]);
   const tableRef = useRef(null);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      const { data } = await api.get("/admin/payments");
+      const params = {};
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo) params.dateTo = dateTo;
+      const { data } = await api.get("/admin/payments", { params });
       setPayments(Array.isArray(data?.payments) ? data.payments : []);
     } catch (error) {
       setErrorMessage(
@@ -82,11 +88,21 @@ export default function Payments() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchPayments();
-  }, []);
+  }, [fetchPayments]);
+
+  useEffect(() => {
+    socket.on("order:status-updated", fetchPayments);
+    socket.on("order:created", fetchPayments);
+
+    return () => {
+      socket.off("order:status-updated", fetchPayments);
+      socket.off("order:created", fetchPayments);
+    };
+  }, [fetchPayments]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -239,7 +255,7 @@ export default function Payments() {
         >
           <h1 className="text-3xl font-bold md:text-4xl">Payments</h1>
           <p className="mt-2 text-sm text-orange-50 md:text-base">
-            Monitor semua transaksi pembayaran dan perbarui statusnya.
+            Monitor pembayaran — filter tanggal mengikuti tanggal dibuat order.
           </p>
         </section>
 
@@ -273,19 +289,49 @@ export default function Payments() {
               Payment List
             </h2>
 
-            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+            <div className="flex w-full flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Dari
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                    className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                  Sampai
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(event) => setDateTo(event.target.value)}
+                    className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                  className="mt-5 rounded-lg border border-orange-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-orange-50"
+                >
+                  Reset tanggal
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="Cari Order/Transaksi/Nama"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 md:w-64"
+                className="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 lg:w-56"
               />
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400"
+                className="rounded-lg border border-orange-200 px-3 py-2 text-sm outline-hidden focus:border-orange-400 lg:w-auto"
               >
                 <option value="all">Semua Status</option>
                 {PAYMENT_STATUS_OPTIONS.map((status) => (

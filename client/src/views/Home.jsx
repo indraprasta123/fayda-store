@@ -578,7 +578,16 @@ export default function Home() {
                   return (
                     <article
                       key={item.id}
-                      className={`overflow-hidden rounded-2xl border shadow-lg transition duration-300 hover:-translate-y-1 ${
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => navigate(`/produk/${item.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/produk/${item.id}`);
+                        }
+                      }}
+                      className={`cursor-pointer overflow-hidden rounded-2xl border shadow-lg transition duration-300 hover:-translate-y-1 ${
                         isDark
                           ? "border-slate-700 bg-slate-950/75"
                           : "border-slate-100 bg-white"
@@ -716,7 +725,16 @@ export default function Home() {
                             return (
                               <div
                                 key={item.id}
-                                className={`rounded-lg p-2 shadow-md ${
+                                role="link"
+                                tabIndex={0}
+                                onClick={() => navigate(`/produk/${item.id}`)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    navigate(`/produk/${item.id}`);
+                                  }
+                                }}
+                                className={`cursor-pointer rounded-lg p-2 shadow-md ${
                                   isDark ? "bg-slate-700" : "bg-white"
                                 }`}
                               >
@@ -754,7 +772,11 @@ export default function Home() {
                                   Stok: {Number.isFinite(stock) ? stock : "-"}
                                 </p>
                                 <button
-                                  onClick={() => handleAddToCart(item)}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToCart(item);
+                                  }}
                                   disabled={isOutOfStock}
                                   className={`mt-2 w-full py-1 rounded text-sm transition ${
                                     isOutOfStock
@@ -931,7 +953,16 @@ export default function Home() {
                   <div
                     key={item.id}
                     ref={(el) => (productCardsRef.current[i] = el)}
-                    className={`group relative overflow-hidden rounded-3xl p-3 shadow-md transition-all duration-500 hover:-translate-y-2 ${
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(`/produk/${item.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate(`/produk/${item.id}`);
+                      }
+                    }}
+                    className={`group relative cursor-pointer overflow-hidden rounded-3xl p-3 shadow-md transition-all duration-500 hover:-translate-y-2 ${
                       isDark
                         ? "bg-slate-900 hover:shadow-[0_20px_40px_rgba(99,102,241,0.22)]"
                         : "bg-white hover:shadow-[0_20px_40px_rgba(249,115,22,0.28)]"
@@ -995,7 +1026,11 @@ export default function Home() {
                     </p>
 
                     <button
-                      onClick={() => handleAddToCart(item)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(item);
+                      }}
                       disabled={isOutOfStock}
                       className={`mt-2 w-full rounded-2xl py-2 text-white transition-all duration-300 hover:shadow-lg ${
                         isOutOfStock

@@ -16,6 +16,29 @@ const {
 } = require("../socket");
 const { cloudinary } = require("../helpers/cloudinary");
 
+const buildOrderCreatedAtRange = (dateFrom, dateTo) => {
+  const range = {};
+  if (dateFrom) {
+    const start = new Date(dateFrom);
+    if (Number.isNaN(start.getTime())) return { error: "Invalid dateFrom" };
+    start.setHours(0, 0, 0, 0);
+    range[Op.gte] = start;
+  }
+  if (dateTo) {
+    const end = new Date(dateTo);
+    if (Number.isNaN(end.getTime())) return { error: "Invalid dateTo" };
+    end.setHours(23, 59, 59, 999);
+    range[Op.lte] = end;
+  }
+  if (range[Op.gte] && range[Op.lte] && range[Op.gte] > range[Op.lte]) {
+    range[Op.gte] = new Date(dateTo);
+    range[Op.gte].setHours(0, 0, 0, 0);
+    range[Op.lte] = new Date(dateFrom);
+    range[Op.lte].setHours(23, 59, 59, 999);
+  }
+  return Object.keys(range).length ? { createdAt: range } : {};
+};
+
 const uploadImageToCloudinary = async (file) => {
   if (!file) return null;
 
@@ -396,7 +419,16 @@ class AdminController {
 
   static async getRecapReport(req, res, next) {
     try {
-      const { period = "day", date, month, year, topScope = "day" } = req.query;
+      const {
+        period = "day",
+        date,
+        month,
+        year,
+        topScope = "day",
+        orderScope,
+      } = req.query;
+
+      const scopeSalesOnly = orderScope !== "all";
 
       const now = new Date();
       let rangeStart;
@@ -460,13 +492,27 @@ class AdminController {
         topEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
       }
 
+      const recapWhere = {
+        createdAt: {
+          [Op.between]: [rangeStart, rangeEnd],
+        },
+      };
+      if (scopeSalesOnly) {
+        recapWhere.status = "delivered";
+      }
+
+      const topWhere = {
+        createdAt: {
+          [Op.between]: [topStart, topEnd],
+        },
+      };
+      if (scopeSalesOnly) {
+        topWhere.status = "delivered";
+      }
+
       const [orders, topOrders] = await Promise.all([
         Order.findAll({
-          where: {
-            createdAt: {
-              [Op.between]: [rangeStart, rangeEnd],
-            },
-          },
+          where: recapWhere,
           include: [
             { model: User, as: "user", attributes: ["id", "name", "email"] },
             {
@@ -484,11 +530,7 @@ class AdminController {
           order: [["createdAt", "DESC"]],
         }),
         Order.findAll({
-          where: {
-            createdAt: {
-              [Op.between]: [topStart, topEnd],
-            },
-          },
+          where: topWhere,
           include: [
             {
               model: OrderItem,
@@ -572,6 +614,7 @@ class AdminController {
           topScope,
           rangeStart,
           rangeEnd,
+          orderScope: scopeSalesOnly ? "sales" : "all",
         },
         summary: {
           totalOrders,
@@ -588,7 +631,14 @@ class AdminController {
 
   static async getAllOrders(req, res, next) {
     try {
+      const { dateFrom, dateTo } = req.query;
+      const dateFilter = buildOrderCreatedAtRange(dateFrom, dateTo);
+      if (dateFilter.error) {
+        throw { name: "BadRequest", message: dateFilter.error };
+      }
+
       const orders = await Order.findAll({
+        where: dateFilter.createdAt ? dateFilter : undefined,
         include: [
           { model: User, as: "user", attributes: ["id", "name", "email"] },
           {
@@ -637,7 +687,14 @@ class AdminController {
 
   static async getAllPayments(req, res, next) {
     try {
+      const { dateFrom, dateTo } = req.query;
+      const dateFilter = buildOrderCreatedAtRange(dateFrom, dateTo);
+      if (dateFilter.error) {
+        throw { name: "BadRequest", message: dateFilter.error };
+      }
+
       const orders = await Order.findAll({
+        where: dateFilter.createdAt ? dateFilter : undefined,
         include: [
           { model: User, as: "user", attributes: ["id", "name", "email"] },
           { model: Payment, as: "payment" },
