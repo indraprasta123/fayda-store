@@ -885,7 +885,7 @@ export default function Home() {
 
       {/* PRODUCTS */}
       <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-6 flex items-end justify-between gap-4">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2
               className={`text-2xl font-bold ${isDark ? "text-slate-100" : "text-slate-900"}`}
@@ -903,7 +903,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => navigate("/produk")}
-            className={`hidden rounded-full px-4 py-2 text-sm font-semibold transition md:inline-flex ${
+            className={`inline-flex w-full shrink-0 justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition sm:w-auto ${
               isDark
                 ? "bg-indigo-600 text-white hover:bg-indigo-700"
                 : "bg-orange-500 text-white hover:bg-orange-600"

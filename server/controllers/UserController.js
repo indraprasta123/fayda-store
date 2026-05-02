@@ -12,6 +12,9 @@ const {
 const { fn, col } = require("sequelize");
 const { sendNewOrderTelegram } = require("../services/telegram.service");
 const { emitOrderCreated, emitProductSync } = require("../socket");
+const {
+  calculateShippingFromLatLng,
+} = require("../services/shippingService");
 
 class UserController {
   static async getProducts(req, res, next) {
@@ -174,6 +177,41 @@ class UserController {
 
       if (!user) {
         throw { name: "NotFound", message: "User not found" };
+      }
+
+      let subtotal = 0;
+      for (const item of cartItems) {
+        const productId = Number(item.id);
+        const quantity = Number(item.quantity || item.qty || 1);
+        const product = await Product.findByPk(productId);
+        if (!product) {
+          throw {
+            name: "NotFound",
+            message: `Product with id ${productId} not found`,
+          };
+        }
+        subtotal += Number(product.price) * quantity;
+      }
+
+      const lat = Number(deliveryInfo.latitude ?? deliveryInfo.lat);
+      const lng = Number(deliveryInfo.longitude ?? deliveryInfo.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw {
+          name: "BadRequest",
+          message:
+            "Koordinat pengiriman tidak valid. Gunakan Ambil Lokasi Otomatis di halaman pengiriman.",
+        };
+      }
+
+      const shippingQuote = await calculateShippingFromLatLng(lat, lng);
+      const expectedTotal = subtotal + shippingQuote.shippingCost;
+      const receivedTotal = Number(totalPrice);
+      if (Math.abs(receivedTotal - expectedTotal) > 2) {
+        throw {
+          name: "BadRequest",
+          message:
+            "Total pembayaran tidak sesuai harga produk dan ongkir saat ini. Muat ulang halaman pembayaran dan coba lagi.",
+        };
       }
 
       const createdOrder = await sequelize.transaction(async (transaction) => {

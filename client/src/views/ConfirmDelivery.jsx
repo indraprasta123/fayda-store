@@ -4,28 +4,12 @@ import { Link, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { readCartItems } from "../utils/cartStorage";
 import { useSettings } from "../context/SettingsContext";
+import api from "../api/axios";
 
-const STORE_LAT = Number(import.meta.env.VITE_STORE_LAT || -6.261492);
-const STORE_LNG = Number(import.meta.env.VITE_STORE_LNG || 106.842827);
-
-const calculateDistanceKm = (userLat, userLng, storeLat, storeLng) => {
-  const toRadians = (value) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-
-  const latitudeDiff = toRadians(storeLat - userLat);
-  const longitudeDiff = toRadians(storeLng - userLng);
-  const latitudeStart = toRadians(userLat);
-  const latitudeEnd = toRadians(storeLat);
-
-  const a =
-    Math.sin(latitudeDiff / 2) ** 2 +
-    Math.cos(latitudeStart) *
-      Math.cos(latitudeEnd) *
-      Math.sin(longitudeDiff / 2) ** 2;
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusKm * c;
-};
+/** Untuk teks informasi saja — harus selaras dengan `MAX_DELIVERY_DISTANCE_KM` di server (.env) */
+const MAX_DELIVERY_DISTANCE_KM = Number(
+  import.meta.env.VITE_MAX_DELIVERY_DISTANCE_KM || 20,
+);
 
 export default function ConfirmDelivery() {
   const navigate = useNavigate();
@@ -34,6 +18,9 @@ export default function ConfirmDelivery() {
   const [cartItems, setCartItems] = useState([]);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [hasAutoLocation, setHasAutoLocation] = useState(false);
+  const [shippingQuote, setShippingQuote] = useState(null);
+  const [shippingError, setShippingError] = useState(null);
+  const [isShippingLoading, setIsShippingLoading] = useState(false);
   const headerRef = useRef(null);
   const formRef = useRef(null);
   const summaryRef = useRef(null);
@@ -124,6 +111,46 @@ export default function ConfirmDelivery() {
     setRecipient({ ...recipient, [e.target.name]: e.target.value });
   };
 
+  const fetchShippingQuote = async (latitude, longitude) => {
+    const latN = Number(latitude);
+    const lngN = Number(longitude);
+    if (!Number.isFinite(latN) || !Number.isFinite(lngN)) {
+      const msg = "Koordinat GPS tidak valid. Coba Ambil Lokasi lagi.";
+      setShippingError(msg);
+      Swal.fire({ icon: "error", title: "Ongkir", text: msg });
+      return false;
+    }
+
+    setIsShippingLoading(true);
+    setShippingError(null);
+    try {
+      const { data } = await api.post("/shipping/shipping-cost", {
+        lat: latN,
+        lng: lngN,
+        latitude: latN,
+        longitude: lngN,
+        // Fallback jika API/proxy lama hanya membaca `address` (geocode dari titik koordinat)
+        address: `${latN},${lngN}`,
+      });
+      setShippingQuote({
+        distanceKm: data.distance,
+        shippingCost: data.shippingCost,
+      });
+      return true;
+    } catch (error) {
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Gagal menghitung ongkir";
+      setShippingQuote(null);
+      setShippingError(msg);
+      Swal.fire({ icon: "error", title: "Ongkir", text: msg });
+      return false;
+    } finally {
+      setIsShippingLoading(false);
+    }
+  };
+
   const handleGetLocation = async () => {
     if (!navigator.geolocation) {
       Swal.fire("Error", "Geolocation not supported", "error");
@@ -131,6 +158,8 @@ export default function ConfirmDelivery() {
     }
 
     setIsGettingLocation(true);
+    setShippingQuote(null);
+    setShippingError(null);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -167,7 +196,10 @@ export default function ConfirmDelivery() {
         setHasAutoLocation(true);
 
         setIsGettingLocation(false);
-        Swal.fire("Success", "Lokasi berhasil diambil", "success");
+        const shippingOk = await fetchShippingQuote(latitude, longitude);
+        if (shippingOk) {
+          Swal.fire("Success", "Lokasi berhasil diambil", "success");
+        }
       },
       (error) => {
         setHasAutoLocation(false);
@@ -203,14 +235,33 @@ export default function ConfirmDelivery() {
       return;
     }
 
+    if (isShippingLoading) {
+      Swal.fire(
+        "Mohon tunggu",
+        "Sedang menghitung ongkir dari server...",
+        "info",
+      );
+      return;
+    }
+
+    if (!shippingQuote) {
+      Swal.fire(
+        "Warning",
+        shippingError ||
+          "Ongkir belum tersedia. Pastikan lokasi berhasil dan perhitungan ongkir selesai.",
+        "warning",
+      );
+      return;
+    }
+
     localStorage.setItem(
       "deliveryInfo",
       JSON.stringify({
         ...recipient,
-        shippingDistanceKm: Number(shippingInfo.distanceKm.toFixed(2)),
-        shippingBillableKm: shippingInfo.billableKm,
-        shippingRatePerKm: shippingInfo.ratePerKm,
-        shippingCost: shippingInfo.shippingCost,
+        shippingDistanceKm: Number(Number(shippingQuote.distanceKm).toFixed(2)),
+        shippingBillableKm: 0,
+        shippingRatePerKm: 0,
+        shippingCost: shippingQuote.shippingCost,
         subtotalPrice: normalizedTotalPrice,
         grandTotal,
       }),
@@ -237,49 +288,9 @@ export default function ConfirmDelivery() {
     [normalizedCart],
   );
 
-  const shippingInfo = useMemo(() => {
-    if (!hasAutoLocation) {
-      return {
-        distanceKm: 0,
-        billableKm: 0,
-        ratePerKm: 0,
-        shippingCost: 0,
-      };
-    }
-
-    const latitude = Number(recipient.lat);
-    const longitude = Number(recipient.lng);
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return {
-        distanceKm: 0,
-        billableKm: 0,
-        ratePerKm: 0,
-        shippingCost: 0,
-      };
-    }
-
-    const distanceKm = calculateDistanceKm(
-      latitude,
-      longitude,
-      STORE_LAT,
-      STORE_LNG,
-    );
-    const ratePerKm = distanceKm > 10 ? 2000 : 1000;
-    const billableKm = distanceKm > 0 ? Math.max(1, Math.floor(distanceKm)) : 0;
-    const shippingCost = billableKm * ratePerKm;
-
-    return {
-      distanceKm,
-      billableKm,
-      ratePerKm,
-      shippingCost,
-    };
-  }, [recipient.lat, recipient.lng, hasAutoLocation]);
-
   const grandTotal = useMemo(
-    () => normalizedTotalPrice + shippingInfo.shippingCost,
-    [normalizedTotalPrice, shippingInfo.shippingCost],
+    () => normalizedTotalPrice + (shippingQuote?.shippingCost ?? 0),
+    [normalizedTotalPrice, shippingQuote?.shippingCost],
   );
 
   return (
@@ -503,8 +514,12 @@ export default function ConfirmDelivery() {
                   isDark ? "text-slate-400" : "text-slate-500"
                 }`}
               >
-                Mohon maaf, untuk sementara ini kami hanya menerima order dengan jarak maksimal 30 km saja. Terima kasih.
+                Ongkir dihitung dari jarak rute mengemudi (sama dengan sistem checkout). Maksimal{" "}
+                {MAX_DELIVERY_DISTANCE_KM} km dari toko.
               </p>
+              {shippingError && !shippingQuote ? (
+                <p className="mt-2 text-xs text-red-500">{shippingError}</p>
+              ) : null}
               <div className="mt-4 space-y-3">
                 {normalizedCart.map((item) => (
                   <div
@@ -577,24 +592,29 @@ export default function ConfirmDelivery() {
                 >
                   <span>
                     Ongkir
-                    {shippingInfo.billableKm > 0
-                      ? ` (${shippingInfo.billableKm} km × Rp ${shippingInfo.ratePerKm.toLocaleString("id-ID")}/km)`
-                      : " (klik Ambil Lokasi Otomatis)"}
+                    {isShippingLoading
+                      ? " (menghitung dari server...)"
+                      : shippingQuote
+                        ? " (tarif bertingkat, jarak rute)"
+                        : hasAutoLocation
+                          ? ""
+                          : " (klik Ambil Lokasi Otomatis)"}
                   </span>
                   <span
                     className={`font-semibold ${isDark ? "text-slate-100" : "text-slate-800"}`}
                   >
-                    Rp {shippingInfo.shippingCost.toLocaleString("id-ID")}
+                    {isShippingLoading
+                      ? "…"
+                      : `Rp ${(shippingQuote?.shippingCost ?? 0).toLocaleString("id-ID")}`}
                   </span>
                 </div>
 
-                {shippingInfo.distanceKm > 0 ? (
+                {shippingQuote?.distanceKm > 0 ? (
                   <p
                     className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}
                   >
-                    Jarak aktual: {shippingInfo.distanceKm.toFixed(2)} km
+                    Jarak rute (pengemudi): {Number(shippingQuote.distanceKm).toFixed(2)} km
                   </p>
-                  
                 ) : null}
 
                 <div

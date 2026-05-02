@@ -290,9 +290,11 @@ export default function Payment() {
               }`}
             >
               Ongkir
-              {shippingRatePerKm > 0
+              {shippingRatePerKm > 0 && shippingBillableKm > 0
                 ? ` (${shippingBillableKm} km × Rp ${shippingRatePerKm.toLocaleString("id-ID")}/km)`
-                : ""}
+                : shippingDistanceKm > 0
+                  ? " (tarif bertingkat dari jarak rute)"
+                  : ""}
             </p>
             <p
               className={`text-base font-semibold ${
@@ -308,7 +310,7 @@ export default function Payment() {
                   isDark ? "text-slate-400" : "text-slate-500"
                 }`}
               >
-                Jarak aktual: {shippingDistanceKm.toFixed(2)} km
+                Jarak rute (pengemudi): {shippingDistanceKm.toFixed(2)} km
               </p>
             ) : null}
 

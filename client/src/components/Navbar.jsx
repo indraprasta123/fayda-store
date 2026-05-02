@@ -357,17 +357,13 @@ export default function Navbar() {
             >
               Produk
             </NavLink>
-            <Link
-              to="/register"
-              className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                isDark
-                  ? "border-slate-700 text-slate-200"
-                  : "border-slate-200 text-slate-700"
-              }`}
+            <NavLink
+              to="/profile"
+              className={navLinkClass}
               onClick={() => setOpen(false)}
             >
               Profile
-            </Link>
+            </NavLink>
             <button
               type="button"
               className="rounded-full border border-red-200 px-4 py-2 text-sm font-medium text-red-500"

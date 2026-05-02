@@ -10,8 +10,6 @@ const router = require("./routers");
 const app = express();
 
 const defaultAllowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
   "https://faydaa.store",
   "https://admin-fayda-store.web.app",
 ];
