@@ -19,7 +19,7 @@ const TOP_SCOPE_OPTIONS = [
 ];
 
 const ORDER_SCOPE_OPTIONS = [
-  { value: "sales", label: "Order selesai saja (penjualan)" },
+  { value: "sales", label: "Selesai" },
   { value: "all", label: "Semua status" },
 ];
 
